@@ -38,8 +38,9 @@
 #include <libgen.h>
 #include <dirent.h>
 #include <cstdlib>
-#include "triangle.h"
+#include "elas.h"
 #include <sstream>
+
 using namespace std;
 using namespace cv;
 
@@ -73,8 +74,12 @@ void clearNearbyOpticalflow(Mat* frame, int y)
 	{
 	  for (int j=0; j<frame->cols; j++)
 		{
-		  Vec3b rgb = Vec3b(0, 0, 0);
-		  frame->at<Vec3b>(i, j) = rgb;
+      if (frame->channels() == 3) {
+        Vec3b rgb = Vec3b(0, 0, 0);
+        frame->at<Vec3b>(i, j) = rgb;
+      } else if (frame->channels() == 1) {
+        frame->at<char>(i, j) = 0;
+      }
 		}
 	}
 }
@@ -82,7 +87,108 @@ void clearNearbyOpticalflow(Mat* frame, int y)
 void help () {
   cout << "./viso video_name pcd_saved_dir scale pitch start_frame" << endl;
 }
+
+// compute disparities of pgm image input pair file_1, file_2
+void getDisparity(Mat& left_img, Mat& right_img, Mat& left_img_disp8, Mat& right_img_disp8)
+{
+  // cout << "Processing: " << file_1 << "\t" << file_2 << endl;
+  // load images
+  // image<uchar> *I1,*I2;
+  // I1 = loadPGM(file_1);
+  // I2 = loadPGM(file_2);
+  // // check for correct size
+  // if (I1->width()<=0 || I1->height() <=0 || I2->width()<=0 || I2->height() <=0 ||
+  //     I1->width()!=I2->width() || I1->height()!=I2->height()) {
+  //   cout << "ERROR: Images must be of same size, but" << endl;
+  //   cout << "       I1: " << I1->width() <<  " x " << I1->height() <<
+  //                ", I2: " << I2->width() <<  " x " << I2->height() << endl;
+  //   delete I1;
+  //   delete I2;
+  //   return;
+  // }
+  // get image width and height
+  // int32_t width  = I1->width();
+  // int32_t height = I1->height();
+  int width = left_img.cols;
+  int height = right_img.rows;
+
+  // allocate memory for disparity images
+  const int32_t dims[3] = {width,height,width}; // bytes per line = width
+  float* D1_data = (float*)malloc(width*height*sizeof(float));
+  float* D2_data = (float*)malloc(width*height*sizeof(float));
+
+  // process
+  Elas::parameters param;
+  param.postprocess_only_left = false;
+  Elas elas(param);
+  elas.process(left_img.data,right_img.data,D1_data,D2_data,dims);
+
+  // find maximum disparity for scaling output disparity images to [0..255]
+  // float disp_max = 0;
+  // for (int32_t i=0; i<width*height; i++) {
+  //   if (D1_data[i]>disp_max) disp_max = D1_data[i];
+  //   if (D2_data[i]>disp_max) disp_max = D2_data[i];
+  // }
+
+  // copy float to uchar
+  // image<uchar> *D1 = new image<uchar>(width,height);
+  // image<uchar> *D2 = new image<uchar>(width,height);
+  // for (int32_t i=0; i<width*height; i++) {
+  //   D1->data[i] = (uint8_t)max(255.0*D1_data[i]/disp_max,0.0);
+  //   D2->data[i] = (uint8_t)max(255.0*D2_data[i]/disp_max,0.0);
+  // }
+  Mat left_img_disp(height, width, CV_32FC1, D1_data);
+  Mat right_img_disp(height, width, CV_32FC1, D2_data);
+  // float max_val, min_val;
+  // Mat left_img_disp8, right_img_disp8;
+  // minMaxLoc(left_img_disp, &min_val, &max_val);
+  normalize(left_img_disp, left_img_disp8, 0, 255, CV_MINMAX, CV_8U);
+  normalize(right_img_disp, right_img_disp8, 0, 255, CV_MINMAX, CV_8U);
+
+  // save disparity images
+  // char output_1[1024];
+  // char output_2[1024];
+
+  // strncpy(output_1,file_1,strlen(file_1)-4);
+  // strncpy(output_2,file_2,strlen(file_2)-4);
+  // output_1[strlen(file_1)-4] = '\0';
+  // output_2[strlen(file_2)-4] = '\0';
+  // strcat(output_1,"_disp.png");
+  // strcat(output_2,"_disp.png");
+  // imwrite(output_1, left_img_disp);
+  // imwrite(output_2, right_img_disp);
+  // savePGM(D1,output_1);
+  // savePGM(D2,output_2);
+
+  // free memory
+  // delete I1;
+  // delete I2;
+  // delete D1;
+  // delete D2;
+  free(D1_data);
+  free(D2_data);
+}
+
 int main (int argc, char** argv) {
+
+  // Mat img1 = imread(argv[1], 0);
+  // Mat img2 = imread(argv[2], 0);
+  // resize(img1, img1, Size(0.5*img1.cols, 0.5*img1.rows));
+  // resize(img2, img2, Size(0.5*img2.cols, 0.5*img2.rows));
+  // clearNearbyOpticalflow(&img1, 420);
+  // clearNearbyOpticalflow(&img2, 420);
+  // cout << "hello world" << endl;
+  // Mat img1_disp, img2_disp;
+  // getDisparity(img1, img2, img1_disp, img2_disp);
+  // imshow ("img1", img1);
+  // imshow("img1 disp", img1_disp);
+  // imshow("img2 disp", img2_disp);
+  // string im1_disp = argv[1];
+  // im1_disp = im1_disp.substr(0, im1_disp.length()-4)+ "_disp.png";
+  // imwrite(im1_disp, img1_disp);
+
+  // waitKey(0);
+  // return 0;
 
   help();
   ofstream ofs("log.txt");
@@ -174,7 +280,10 @@ int main (int argc, char** argv) {
 
   // loop through all frames
   // for (int32_t i=first_frame; i < last_frame; i+=step) {
-  Mat left_img, optical_flow;
+  Mat gray_frame, optical_flow;
+  Mat left_img, right_img;
+  Mat left_img_disp8, right_img_disp8;
+
   const int k_factor = 23;
   int SKIPPED_FRAMES = 2;
   int velocity_world;
@@ -197,8 +306,8 @@ int main (int argc, char** argv) {
   Mat prev_prev_t(3, 1, CV_64FC1);
   double kkk = 0.7;
   int counter = 0;
+  Mat frame;
   for ( ;; ) {
-    Mat frame;
     cap >> frame;
     if (frame.empty())
       return 0;
@@ -226,26 +335,26 @@ int main (int argc, char** argv) {
     cout << "Processing: Frame: " << curr_frame << endl;// cap.get(CV_CAP_PROP_POS_FRAMES) << endl;
 
     // catch image read/write errors here
-    resize(frame, frame, Size(0.5*scale*frame.cols, 0.5*scale*frame.rows));
+    resize(frame, frame, Size(0.5*frame.cols, 0.5*frame.rows));
     // undistorted image
 
     clearNearbyOpticalflow(&frame, 420);
-    cvtColor(frame, left_img, COLOR_BGR2GRAY);
-    int width = left_img.cols;
-    int height = left_img.rows;
+    cvtColor(frame, gray_frame, COLOR_BGR2GRAY);
+    int width = gray_frame.cols;
+    int height = gray_frame.rows;
     // convert input images to uint8_t buffer
-    uint8_t* left_img_data = (uint8_t*)malloc(width*height*sizeof(uint8_t));
+    uint8_t* gray_frame_data = (uint8_t*)malloc(width*height*sizeof(uint8_t));
     int32_t k=0;
     for (int32_t v=0; v<height; v++) {
       for (int32_t u=0; u<width; u++) {
-        left_img_data[k++] = left_img.at<char>(v, u);
+        gray_frame_data[k++] = gray_frame.at<char>(v, u);
       }
     }
 
     vector<Matcher::p_match> p_matched = viso.getMatches();
     // compute visual odometry
     int32_t dims[] = {width,height,width};
-    if (viso.process(left_img_data,dims)) {
+    if (viso.process(gray_frame_data,dims)) {
       // on success, update current pose
       // Matrix pose_tmp = Matrix::eye(4);
       // pose_tmp = pose * Matrix::inv(viso.getMotion());
@@ -301,7 +410,7 @@ int main (int argc, char** argv) {
         Rodrigues(r_calc, r_degree);
         cout << "r_calc: \n" << r_degree << endl;
         r_degree.at<double>(0, 0) = kkk*r_degree.at<double>(0, 0) + (1.0-kkk)*r_predict.at<double>(0, 0);
-        r_degree.at<double>(1, 0) = 1.0*kkk*r_degree.at<double>(1, 0) + 1.0*(1-kkk)*r_predict.at<double>(1, 0);
+        r_degree.at<double>(1, 0) = kkk*r_degree.at<double>(1, 0) + (1-kkk)*r_predict.at<double>(1, 0);
         r_degree.at<double>(2, 0) = kkk*r_degree.at<double>(2, 0) + (1.0-kkk)*r_predict.at<double>(2, 0);
         cout << "r update: \n" << r_degree << endl;
         cout << "pose: \n" << pose << endl;
@@ -353,12 +462,21 @@ int main (int argc, char** argv) {
         // prev_t = tmp_t;
       }
 
+      //  right_img = gray_frame;
+      right_img = gray_frame.clone();
+      if (!left_img.empty()) {
+        getDisparity(left_img, right_img, left_img_disp8, right_img_disp8);
+        imshow("left disp8", left_img_disp8);
+        getDisparity(right_img, left_img, left_img_disp8, right_img_disp8);
+        imshow("right disp8", right_img_disp8);
+      }
+      // left_img = right_img;
+      cv::swap(left_img, right_img);
+
       // output some statistics
       double num_matches = viso.getNumberOfMatches();
       double num_inliers = viso.getNumberOfInliers();
-
       // reconstruction from 3d
-
       re3d.update(p_matched, viso.getMotion(), 1, 2, 30, 3);
       vector<Reconstruction::point3d> p = re3d.getPoints();
       if (save_flag) {
@@ -384,12 +502,14 @@ int main (int argc, char** argv) {
       cout << " ... failed!" << endl;
       // ofs << " ... failed!" << endl;
     }
-    imshow("frame", left_img);
-    optical_flow = Mat::zeros(left_img.rows, left_img.cols, CV_8UC3);
+    imshow("frame", gray_frame);
+    optical_flow = Mat::zeros(gray_frame.rows, gray_frame.cols, CV_8UC3);
     drawMatched(p_matched, optical_flow);
     imshow("matched", optical_flow);
+    // prev_image
+    // left_img = gray_frame;
     // release uint8_t buffers
-    free(left_img_data);
+    free(gray_frame_data);
     if (waitKey(10)==27 || waitKey(10)==0x20)
       break;
 
